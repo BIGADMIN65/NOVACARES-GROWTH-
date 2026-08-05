@@ -1,94 +1,103 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
-from flask_sqlalchemy import SQLAlchemy
-from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
-from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime
+from flask import Flask, render_template, request, redirect, url_for, flash, session
 import os
+import sqlite3
+from datetime import datetime
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'novacares-secret-key-2026'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///novacares.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'novacares-secret-key-2026')
+DATABASE = 'instance/novacares.db'
 
-db = SQLAlchemy(app)
-login_manager = LoginManager(app)
-login_manager.login_view = 'login'
+# Make sure instance folder exists
+os.makedirs('instance', exist_ok=True)
 
-# DATABASE MODELS
-class User(db.Model, UserMixin):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
-    password = db.Column(db.String(200), nullable=False)
-    balance = db.Column(db.Float, default=0.0)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+# Database setup
+def get_db():
+    conn = sqlite3.connect(DATABASE)
+    conn.row_factory = sqlite3.Row
+    return conn
 
-class Deposit(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    amount = db.Column(db.Float)
-    status = db.Column(db.String(20), default='Pending')
-    date = db.Column(db.DateTime, default=datetime.utcnow)
+def init_db():
+    with app.app_context():
+        db = get_db()
+        db.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL,
+                balance REAL DEFAULT 0.0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        db.commit()
 
-class Withdrawal(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    amount = db.Column(db.Float)
-    status = db.Column(db.String(20), default='Pending')
-    date = db.Column(db.DateTime, default=datetime.utcnow)
+init_db()
 
-@login_manager.user_loader
-def load_user(user_id):
-    return User.query.get(int(user_id))
 
-# ROUTES
 @app.route('/')
 def home():
-    return render_template('home.html')
+    return render_template('index.html')
 
-@app.route('/register', methods=['GET', 'POST'])
-def register():
+
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
     if request.method == 'POST':
-        username = request.form['username']
+        name = request.form['name']
         email = request.form['email']
         password = request.form['password']
-        hashed_password = generate_password_hash(password)
-        new_user = User(username=username, email=email, password=hashed_password)
-        db.session.add(new_user)
-        db.session.commit()
-        flash('Account created! Please login.', 'success')
-        return redirect(url_for('login'))
-    return render_template('register.html')
+        
+        db = get_db()
+        try:
+            db.execute('INSERT INTO users (name, email, password) VALUES (?, ?, ?)',
+                       (name, email, password))
+            db.commit()
+            flash('Account created! Please login.', 'success')
+            return redirect(url_for('login'))
+        except sqlite3.IntegrityError:
+            flash('Email already exists', 'error')
+    
+    return render_template('signup.html')
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        user = User.query.filter_by(username=request.form['username']).first()
-        if user and check_password_hash(user.password, request.form['password']):
-            login_user(user)
+        email = request.form['email']
+        password = request.form['password']
+        
+        db = get_db()
+        user = db.execute('SELECT * FROM users WHERE email = ? AND password = ?', 
+                          (email, password)).fetchone()
+        
+        if user:
+            session['user_id'] = user['id']
+            session['user_name'] = user['name']
+            flash('Login successful!', 'success')
             return redirect(url_for('dashboard'))
-        flash('Invalid username or password', 'danger')
+        else:
+            flash('Invalid email or password', 'error')
+    
     return render_template('login.html')
 
-@app.route('/logout')
-@login_required
-def logout():
-    logout_user()
-    return redirect(url_for('home'))
 
 @app.route('/dashboard')
-@login_required
 def dashboard():
-    return render_template('dashboard.html', user=current_user)
+    if 'user_id' not in session:
+        flash('Please login first', 'error')
+        return redirect(url_for('login'))
+    
+    db = get_db()
+    user = db.execute('SELECT * FROM users WHERE id = ?', (session['user_id'],)).fetchone()
+    
+    return render_template('dashboard.html', user=user)
 
-@app.route('/settings')
-@login_required
-def settings():
-    return render_template('settings.html', user=current_user)
 
-# CREATE DATABASE
-with app.app_context():
-    db.create_all()
+@app.route('/logout')
+def logout():
+    session.clear()
+    flash('Logged out successfully', 'success')
+    return redirect(url_for('home'))
+
 
 if __name__ == '__main__':
     app.run(debug=True)
