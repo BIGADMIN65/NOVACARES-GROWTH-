@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard - NOVACARES</title>
+    <style>
+        body { font-family: Arial; background: #f4f4f4; padding: 20px; }
+        .box { background: white; padding: 30px; border-radius: 10px; max-width: 600px; margin: auto; }
+        .balance { font-size: 32px; color: #28a745; }
+        a { color: #007bff; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h2>Welcome, {{ user.name }}!</h2>
+        <p>Your Balance:</p>
+        <p class="balance">$ {{ "%.2f"|format(user.balance) }}</p>
+        <hr>
+        <a href="/logout">Logout</a>
+    </div>
+</body>
+</html>
