@@ -37,8 +37,7 @@ def signup():
             conn.commit()
         except:
             conn.close()
-            return "Email already exists! <a href='/signup'>Try again</a>"
-        conn.close()
+            
         return redirect(url_for('login'))
     return render_template('signup.html')
 
@@ -56,9 +55,7 @@ def login():
         if user:
             session['user_id'] = user['id']
             return redirect(url_for('dashboard'))
-        else:
-            return "Invalid email or password <a href='/login'>Try again</a>"
-    return render_template('login.html')
+        
 
 @app.route('/dashboard')
 def dashboard():
