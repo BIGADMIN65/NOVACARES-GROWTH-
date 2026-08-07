@@ -33,8 +33,7 @@ def signup():
         
         conn = get_db()
         try:
-            conn.execute('INSERT INTO users (name, email, password, balance) VALUES (?, ?, ?)', 
-                         (name, email, password, 0.0))
+      conn.execute('INSERT INTO users (name, email, password, balance) VALUES (?, ?, ?)', 
             conn.commit()
         except:
             conn.close()
