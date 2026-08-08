@@ -12,6 +12,7 @@ conn.execute('''CREATE TABLE IF NOT EXISTS users
              email TEXT UNIQUE NOT NULL, 
              password TEXT NOT NULL, 
              balance REAL DEFAULT 0.0)''')
+conn.execute('DELETE FROM users')  # <-- ADD THIS LINE TO WIPE OLD DATA
 conn.commit()
 conn.close()
 
