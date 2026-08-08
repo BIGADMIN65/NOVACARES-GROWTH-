@@ -33,8 +33,7 @@ def signup():
         password = request.form['password']
 
         conn = get_db()
-        try:
-            conn.execute('INSERT INTO users (name, email, password, balance) VALUES (?, ?, ?)', (name, email, password, 0.0))
+  conn.execute('INSERT INTO users (name, email, password, balance) VALUES (?, ?, ?)', (name, email, password, 0.0))
             conn.commit()
             conn.close()
             return redirect(url_for('login'))
